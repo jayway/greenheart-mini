@@ -1,3 +1,13 @@
+/*
+  This application collects values from sensors measuring light,
+  temperature, humidity, EC and flow within a Hydroponics hardware system.
+  It sends the data to a connected cloud backend, preferrable AWS, via MQTT protocol.
+
+  Author: David Tran
+  Date:   Jan 2019
+*/
+
+
 load('api_config.js');
 load('api_events.js');
 load('api_gpio.js');
@@ -9,19 +19,23 @@ load('api_arduino_tsl2561.js');
 load("api_dht.js");
 load("api_adc.js");
 
-let freq = 3000;
-let topic = 'hydro/' + Cfg.get('device.id');
+/**** PINS ****/
 let dhtPin = 15;
-let showerPin = 21;
-let mock = 5;	//built-in led pin on Lolin32 board
 let mydht = DHT.create(dhtPin, DHT.DHT11);
+let showerPin = 21;
+let led = 5;	//built-in led pin on Lolin32 board
 let btn = 17; //if button is connected to the board
 
+/**** FREQUENTCYS and CONSTANTS****/
+let freq = 3000;
+
+/**** MQTT TOPICS ****/
+let topic = 'hydro/' + Cfg.get('device.id') + '/sensorData';
 
 // Enable pins at start. Built in led pin 5 turns on when low and off att high
 GPIO.set_mode(showerPin, GPIO.MODE_OUTPUT);
-GPIO.set_mode(mock, GPIO.MODE_OUTPUT);
-GPIO.write(mock, 0);
+GPIO.set_mode(led, GPIO.MODE_OUTPUT);
+GPIO.write(led, 0);
 GPIO.write(showerPin, 0);
 
 // Initialize Adafruit_TSL2561 library
@@ -68,12 +82,16 @@ let getSensorData = function() {
 
 let send = function() {
   let msg = JSON.stringify(getSensorData());
-  //let ok = MQTT.pub(topic, msg, 1);
-  //print('Published:', ok, topic, '->', msg);
-  print('Sensor data: ', msg);
+  let ok = MQTT.pub(topic, msg, 1);
+  print('Published:', ok, topic, '->', msg);
+  //print('Sensor data: ', msg);
 };
 
 //Frequently send data to AWS IoT with sensordata
 Timer.set(freq, Timer.REPEAT, function() {
       send();
+}, null);
+
+Timer.set(2000, Timer.REPEAT, function() {
+      GPIO.toggle(led);
 }, null);
